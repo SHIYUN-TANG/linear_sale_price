@@ -1,0 +1,119 @@
+---
+title: "simple linear model to determine the expected sale price of detached"
+author: "ST4232"
+date: "October 24, 2020"
+output: pdf_document
+---
+
+## I. Exploratory Data Analysis
+
+```{r, include=FALSE}
+#install.packages("ggplot2") and install.packages("dplyr")
+library(ggplot2)
+library(dplyr)
+
+#Read a comma-separated values (csv) file into DataFrame.
+mydata <- read.csv("/Users/momo/Downloads/real20.csv")
+
+#Set the seed of R‘s random number generator
+set.seed(4232)
+
+#handle missing values in objects
+mydata <- na.omit(mydata)
+
+#takes a sample of 200 from the data
+ran_ch <- sample(unique(mydata$ID), 200)
+mydata <- mydata[ran_ch,]
+```
+I use the listed price of the property as the independent variable and use the sold price of the property as the response variable to see the relationship between these two value. From the scatterplot, we can see data doesn't seems follow the linear regression because there's a bad leverage point have x value with an large effect on the modal which doesn't follow the trend pattern ser by the other points. Bad leverage point has grossly effect estimate of the slope of the regression line. To make my result more statistically significent, I decide to remove the bad leverage point from the data.
+
+```{r,echo=FALSE}
+#draw a scatterplot between listed price and sold price
+ggplot(mydata, aes(x = list, y = sold)) + geom_point(aes(color = location)) + labs(
+        title = "Scatterplot between sold price and listed price 4232", x="list price of the property ($)", y = "the actual sale price of the property ($)")+ geom_smooth(method=lm, formula = y ~ x)
+
+```
+
+```{r,include=FALSE}
+#Find the Leverage points
+max_list <- max(mydata$list)
+max_taxes <- max(mydata$taxes)
+
+#Remove the bad leverage point
+mydata <- filter(mydata, mydata$list != max_list)
+mydata <- filter(mydata, mydata$list != max_taxes)
+```
+
+From the scatterplot before removing the bad leverage point, the slope of the linear regression line looks much slower than I supposed because the bad leverage point a large impact on the computed values of various estimates. There's also a point with standardized residual in the graph but since the x-value for this point is not that big so that it will not influence the linear regression line that strong.
+
+```{r, echo=FALSE}
+#Draw a scatterplot between listed price and sold price and between listed price and taxes after removing the leverage points
+ggplot(mydata, aes(x = list, y = sold)) + geom_point(aes(color = location)) + labs(
+        title = "Scatterplot between sold price and listed price 4232", x="list price of the property ($)", y = "the actual sale price of the property ($)") + geom_smooth(method=lm, formula = y ~ x)
+
+ggplot(mydata, aes(x = taxes, y = sold)) + geom_point(aes(color = location)) + labs(
+        title = "Scatterplot between sold price and taxes 4232", x="list price of the property ($)", y = "the actual sale price of the property ($)") + geom_smooth(method=lm, formula = y ~ x)
+```
+
+From the scatterplot between sold price and listed price after removing the leverage, the points are more closely around the linear regression line. And also the points represent relationship between list and sold price in Toronto and the point represent relationship between list and sold price in Mississauga seems have the same pattern. We can also see there's more points present at the The front end of the linear regression line than the rear end of the line, especially the points from Mississauga.
+
+From the scatterplot between sold price and taxes, we can see the points represent relationship between tax and sold price in Toronto mostly stay above the linear regression line and the point represent relationship between tax and sold price in Mississauga mostly stay below the linear regression line. It means if previous year’s property tax are the same, the sold property price in Toronto is higher than the sold property price in Mississauga.
+
+## II. Methods and Model
+
+```{r,include=FALSE}
+#seperate the data by location
+mydata_m <- filter(mydata, mydata$location == "M")
+
+mydata_t <- filter(mydata, mydata$location == "T")
+
+#find the summary of the data
+lm_mydata_t <- lm(sold ~ list, data = mydata_t)
+
+lm_mydata_m <- lm(sold ~ list, data = mydata_m)
+
+lm_mydata <- lm(sold ~ list, data = mydata)
+
+interval_all <- summary(lm_mydata)$coefficients[2,1] + c(-1,1)*qt(0.975, nrow(mydata)-2)*summary(lm_mydata)$coefficients[2,2]
+interval_t <- summary(lm_mydata_t)$coefficients[2,1] + c(-1,1)*qt(0.975, nrow(mydata_t)-2)*summary(lm_mydata_t)$coefficients[2,2]
+interval_m <- summary(lm_mydata_m)$coefficients[2,1] + c(-1,1)*qt(0.975, nrow(mydata_m)-2)*summary(lm_mydata_m)$coefficients[2,2]
+
+summary(lm_mydata)
+
+summary(lm_mydata_t)
+
+summary(lm_mydata_m)
+```
+```{r,echo=FALSE}
+
+#create the table include R^2, the estimated intercept, the estimated slope, the estimate of the variance of the error term, the p-value for the test with null hypothesis that the slope is 0 and a 95% confidence interval for the slope parameter
+mydata_table <- matrix(c(summary(lm_mydata)$r.squared, summary(lm_mydata_t)$r.squared, summary(lm_mydata_m)$r.squared, coefficients(lm_mydata)[1],coefficients(lm_mydata_t)[1] ,coefficients(lm_mydata_m)[1],coefficients(lm_mydata)[2],coefficients(lm_mydata_t)[2] ,coefficients(lm_mydata_m)[2], summary(lm_mydata)$s^2, summary(lm_mydata_t)$s^2, summary(lm_mydata_m)$s^2, summary(lm_mydata)$coefficients[2,4], summary(lm_mydata_t)$coefficients[2,4], summary(lm_mydata_m)$coefficients[2,4], paste("(",interval_all[1],",",interval_all[2],")",sep=""),  paste("(",interval_t[1],",",interval_t[2],")",sep=""), paste("(",interval_m[1],",",interval_m[2],")",sep="")), ncol = 3, byrow = TRUE)
+
+colnames(mydata_table) <- c("All","Toronro","Mississauge")
+rownames(mydata_table) <- c("R-squared","estimated intercept","estimated slope","estimate of the variance of the error term","p-value for the test with null hypothesis that the slope is 0","95% confidence interval for the slope parameter")
+
+table <- as.table(mydata_table)
+
+table
+```
+From the $R^2$ values, it shows how close the data fit measure for linear regression models. The $R^2$ value for both neighbourhood is 0.8122 which means the percentage of response variable variation is explained by a linear model is 0.8122. The $R^2$ value for properties of neighbourhood T is 0.7026 which means the percentage of response variable variation is explained by a linear model is 0.7026. The $R^2$ value for properties of neighbourhood M is 0.9851 which means the percentage of response variable variation is explained by a linear model is 0.9851. The $R^2$ values don't appear similar since from the scatterplot we can see the points represent relationship between list and sold price in Toronto looks have more outlier than the point represent relationship between list and sold price in Mississauga so that in Missisauga we have the biggest $R^2$ values which the data in this model fits the linear regression very well.
+
+A pooled two-sample t-test cannot be used to determine if there is a statistically significant difference between the slopes of the simple linear models for the two neighbourhoods. To use a pooled t-test, we need two independent sample but it's hard to say the slopes of the simple linear models for the two neighbourhoods are independent cause these two neighbourhoods are very closed to each other. The slope of one of the neighhbourhoods might change when the slope of the other neighbourhood changes. Pooled t-test also requires the assumption that two sample come from the population with the same variance. Since we don't know the variance of the population, we can estimate the population variance by observe the sample variance. From the table, the estimate of the variance of the error of the slope respectively are 0.3016 and 0.0103, which has a big different. Therefore two sample don't seems come from the population with the same variance so that a pooled two-sample t-test cannot be used to determine if there is a statistically significant difference between the slopes of the simple linear models for the two neighbourhoods.
+
+## III. Discussions and Limitations
+
+From the r-quared value we calculate from part two, we know that for list and sold price in Mississauga we have the largest r-squared value which means the data relationship between list and sold price in Mississauga fit the linear regression model the most so that we decide to use this model for the next study.
+
+From the qq plot for the residual, we can see it's heavy tailed which the slope on the both end is bigger than the slope in the middle. Therefore the residual doesn't follow a normal distribution and the normal error SLR assumptions is invalid. Also, to be more cautious, we can do the shapiro test for the residual that null hypothesis for this test is that the data are normally distributed. Since the p-value for the test < 0.05, we reject the null hypothesis which means the residual doesn't follow a normal distribution.
+
+```{r,echo=FALSE}
+#draw the qq plot for the residual
+qqnorm(resid(lm_mydata_m),main="Normal Q-Q Plot 4232")
+qqline(resid(lm_mydata_m))
+```
+```{r,include= FALSE}
+#do the shapiro test for the residual
+shapiro.test(resid(lm_mydata))
+```
+
+The other potential numeric predictors that could be used to fit a multiple linear regression for sale price can be the the area of housing in square foot and the number of years the property has been build. The size of the house might be the most visible variable influenve the price of the property since bigger house size have higher sale price. Besides, people also prefer the latest property has been build because compared with the old property, the new property has better living comfort, better service and larger appreciation space.
